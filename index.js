@@ -1,7 +1,7 @@
 require('dotenv').config()
 const express = require('express')
 const cors = require('cors')
-const { MongoClient, ServerApiVersion } = require('mongodb')
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb')
 const admin = require('firebase-admin')
 const port = process.env.PORT || 3000
 const decoded = Buffer.from(process.env.FB_SERVICE_KEY, 'base64').toString('utf-8')
@@ -56,14 +56,37 @@ async function run() {
     const db = client.db('StyleDecor')
     const servicesCollection = db.collection('services')
     const usersCollection = db.collection('users')
+    const decoratorsCollection = db.collection('decorators')
 
     // sevices from db
     app.get('/services',async(req,res)=>{
+
+      const result = await servicesCollection.find().limit(6).toArray()
+      res.send(result)
+
+    })
+    app.get('/services-all',async(req,res)=>{
 
       const result = await servicesCollection.find().toArray()
       res.send(result)
 
     })
+
+     app.get('/services/:id', async (req, res) => {
+      const id = req.params.id
+      const result = await servicesCollection.findOne({ _id: new ObjectId(id) })
+      res.send(result)
+      // console.log(result)
+    })
+
+    // decorators from db
+     app.get('/top-decorators',async(req,res)=>{
+
+      const result = await decoratorsCollection.find().toArray()
+      res.send(result)
+
+    })
+
 
      // save or update a user in db
     app.post('/user', async (req, res) => {
@@ -77,10 +100,10 @@ async function run() {
       }
 
       const alreadyExists = await usersCollection.findOne(query)
-      console.log('User Already Exists---> ', !!alreadyExists)
+      // console.log('User Already Exists---> ', !!alreadyExists)
 
       if (alreadyExists) {
-        console.log('Updating user info......')
+        // console.log('Updating user info......')
         const result = await usersCollection.updateOne(query, {
           $set: {
             last_loggedIn: new Date().toISOString(),
@@ -89,7 +112,7 @@ async function run() {
         return res.send(result)
       }
 
-      console.log('Saving new user info......')
+      // console.log('Saving new user info......')
       const result = await usersCollection.insertOne(userData)
       res.send(result)
     })
