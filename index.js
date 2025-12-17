@@ -121,10 +121,16 @@ async function run() {
       res.send({ role: result?.role })
     })
 
-    // Payment endpoints
+    app.get('/my-bookings', verifyJWT, async (req, res) => {
+      const result = await paymentCollection
+        .find({ customer: req.tokenEmail })
+        .toArray()
+      res.send(result)
+    })
+
+    // Payment 
     app.post('/create-checkout-session', async (req, res) => {
       const paymentInfo = req.body
-      console.log(paymentInfo)
       const session = await stripe.checkout.sessions.create({
         line_items: [
           {
