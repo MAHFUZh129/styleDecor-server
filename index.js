@@ -15,7 +15,7 @@ const app = express()
 // middleware
 app.use(
   cors({
-    origin:[process.env.CLIENT_DOMAIN],
+    origin: [process.env.CLIENT_DOMAIN],
     credentials: true,
     optionSuccessStatus: 200,
   })
@@ -98,10 +98,8 @@ async function run() {
       }
 
       const alreadyExists = await usersCollection.findOne(query)
-      // console.log('User Already Exists---> ', !!alreadyExists)
 
       if (alreadyExists) {
-        // console.log('Updating user info......')
         const result = await usersCollection.updateOne(query, {
           $set: {
             last_loggedIn: new Date().toISOString(),
@@ -109,24 +107,43 @@ async function run() {
         })
         return res.send(result)
       }
-
-      // console.log('Saving new user info......')
       const result = await usersCollection.insertOne(userData)
       res.send(result)
     })
 
-      // get a user's role
+    // get a user's role
     app.get('/user/role', verifyJWT, async (req, res) => {
       const result = await usersCollection.findOne({ email: req.tokenEmail })
       res.send({ role: result?.role })
     })
 
+    // my bookings
     app.get('/my-bookings', verifyJWT, async (req, res) => {
       const result = await paymentCollection
         .find({ customer: req.tokenEmail })
         .toArray()
       res.send(result)
     })
+
+    // payment history
+    app.get('/payments', verifyJWT, async (req, res) => {
+      const email = req.query.email
+      const query = {}
+
+      if (email) {
+        if (email !== req.tokenEmail) {
+          return res.status(403).send({ message: 'forbidden access' })
+        }
+        query.customer = email
+      }
+
+      const result = await paymentCollection
+        .find(query)
+        .toArray()
+
+      res.send(result)
+    })
+
 
     // Payment 
     app.post('/create-checkout-session', async (req, res) => {
@@ -146,7 +163,7 @@ async function run() {
             quantity: paymentInfo?.quantity,
           },
         ],
-       customer_email: paymentInfo?.customer?.email,
+        customer_email: paymentInfo?.customer?.email,
         mode: 'payment',
         metadata: {
           serviceId: paymentInfo?.serviceId,
@@ -175,14 +192,14 @@ async function run() {
           transactionId: session.payment_intent,
           customer: session.metadata.customer,
           status: 'pending',
-          
+          paidAt: new Date().toLocaleDateString(),
           name: service.name,
           category: service.category,
           quantity: 1,
           price: session.amount_total / 100,
           image: service?.image,
         }
-        const result = await paymentCollection.insertOne( paymentInfo)
+        const result = await paymentCollection.insertOne(paymentInfo)
         // update plant quantity
         // await plantsCollection.updateOne(
         //   {
