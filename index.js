@@ -54,6 +54,7 @@ async function run() {
     const servicesCollection = db.collection('services')
     const usersCollection = db.collection('users')
     const decoratorsCollection = db.collection('decorators')
+    const paymentCollection = db.collection('payment')
 
     // sevices from db
     app.get('/services', async (req, res) => {
@@ -114,6 +115,11 @@ async function run() {
       res.send(result)
     })
 
+      // get a user's role
+    app.get('/user/role', verifyJWT, async (req, res) => {
+      const result = await usersCollection.findOne({ email: req.tokenEmail })
+      res.send({ role: result?.role })
+    })
 
     // Payment endpoints
     app.post('/create-checkout-session', async (req, res) => {
@@ -145,6 +151,53 @@ async function run() {
       })
       res.send({ url: session.url })
     })
+
+    app.post('/payment-success', async (req, res) => {
+      const { sessionId } = req.body
+      const session = await stripe.checkout.sessions.retrieve(sessionId)
+      const service = await servicesCollection.findOne({
+        _id: new ObjectId(session.metadata.serviceId),
+      })
+      const payment = await paymentCollection.findOne({
+        transactionId: session.payment_intent,
+      })
+
+      if (session.status === 'complete' && service && !payment) {
+        // save order data in db
+        const paymentInfo = {
+          serviceId: session.metadata.serviceId,
+          transactionId: session.payment_intent,
+          customer: session.metadata.customer,
+          status: 'pending',
+          
+          name: service.name,
+          category: service.category,
+          quantity: 1,
+          price: session.amount_total / 100,
+          image: service?.image,
+        }
+        const result = await paymentCollection.insertOne( paymentInfo)
+        // update plant quantity
+        // await plantsCollection.updateOne(
+        //   {
+        //     _id: new ObjectId(session.metadata.plantId),
+        //   },
+        //   { $inc: { quantity: -1 } }
+        // )
+
+        return res.send({
+          transactionId: session.payment_intent,
+          bookingId: result.insertedId,
+        })
+      }
+      res.send(
+        res.send({
+          transactionId: session.payment_intent,
+          bookingId: payment._id,
+        })
+      )
+    })
+
 
     // Send a ping to confirm a successful connection
     await client.db('admin').command({ ping: 1 })
