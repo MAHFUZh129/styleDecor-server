@@ -90,6 +90,12 @@ async function run() {
       res.send(result)
 
     })
+    app.get('/decorators-all', async (req, res) => {
+
+      const result = await decoratorsCollection.find().toArray()
+      res.send(result)
+
+    })
 
 
     // save or update a user in db
@@ -168,37 +174,40 @@ async function run() {
       }
 
 
-      await decoratorsCollection.updateOne(
+    const result =  await decoratorsCollection.updateOne(
         { _id: new ObjectId(decoratorId) },
         {
           $set: { status: 'assigned' },
         }
       )
 
-      res.send({
-        success: true,
-        message: 'Decorator assigned successfully',
-      })
+      res.send(result)
     }
     )
 
-    // statics
-    app.get('/admin/stats', verifyJWT,  async (req, res) => {
+    app.patch('/admin/decorators/status/:id', verifyJWT, async (req, res) => {
 
-      // total bookings
+      const id = req.params.id
+      const { status } = req.body
+      const result= await decoratorsCollection.updateOne( { _id: new ObjectId(id) },{ $set: { status } })
+
+       res.send(result)
+    })
+
+
+    // statics
+    app.get('/admin/stats', verifyJWT, async (req, res) => {
+
       const totalBookings = await bookingsCollection.countDocuments()
 
-      // total services
       const totalServices = await servicesCollection.countDocuments()
 
-      // total decorators
       const totalDecorators = await decoratorsCollection.countDocuments()
 
-      // total revenue using MongoDB $group operator
       const revenueResult = await bookingsCollection.aggregate([
         {
-          $group: { _id: null,totalRevenue: { $sum: '$price' }} 
-          
+          $group: { _id: null, totalRevenue: { $sum: '$price' } }
+
         }
       ]).toArray()
 
