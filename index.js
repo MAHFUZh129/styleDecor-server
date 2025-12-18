@@ -183,7 +183,7 @@ async function run() {
     )
 
     // statics
-    app.get('/admin/stats', verifyJWT, verifyAdmin, async (req, res) => {
+    app.get('/admin/stats', verifyJWT,  async (req, res) => {
 
       // total bookings
       const totalBookings = await bookingsCollection.countDocuments()
