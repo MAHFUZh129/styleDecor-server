@@ -195,7 +195,7 @@ async function run() {
       const totalDecorators = await decoratorsCollection.countDocuments()
 
       // total revenue using MongoDB $group operator
-      const revenueResult = await paymentCollection.aggregate([
+      const revenueResult = await bookingsCollection.aggregate([
         {
           $group: { _id: null,totalRevenue: { $sum: '$price' }} 
           
