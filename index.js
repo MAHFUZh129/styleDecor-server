@@ -80,7 +80,13 @@ async function run() {
     // decorators from db
     app.get('/top-decorators', async (req, res) => {
 
-      const result = await decoratorsCollection.find().toArray()
+      const result = await decoratorsCollection.find().limit(5).toArray()
+      res.send(result)
+
+    })
+    app.get('/decorators', async (req, res) => {
+
+      const result = await decoratorsCollection.find({ status: 'available' }).toArray()
       res.send(result)
 
     })
@@ -123,6 +129,85 @@ async function run() {
         .find({ customer: req.tokenEmail })
         .toArray()
       res.send(result)
+    })
+    // manage bookings
+    app.get('/admin/bookings', verifyJWT, async (req, res) => {
+      const user = await usersCollection.findOne({ email: req.tokenEmail });
+
+      if (user?.role !== 'admin') {
+        return res.status(403).send({ message: 'Forbidden' });
+      }
+      const result = await bookingsCollection
+        .find()
+        .toArray()
+      res.send(result)
+    })
+
+
+    // status update(bookings and decarators) 
+    app.patch('/admin/assign-decorator/:id', verifyJWT, async (req, res) => {
+      const bookingId = req.params.id
+      const { decoratorId, decoratorName, decoratorEmail } = req.body
+
+
+      const bookingUpdate = await bookingsCollection.updateOne(
+        { _id: new ObjectId(bookingId) },
+        {
+          $set: {
+            decoratorId,
+            decoratorName,
+            decoratorEmail,
+            status: 'assigned',
+          },
+        }
+      )
+
+
+      if (bookingUpdate.modifiedCount === 0) {
+        return res.status(400).send({ message: 'Booking not updated' })
+      }
+
+
+      await decoratorsCollection.updateOne(
+        { _id: new ObjectId(decoratorId) },
+        {
+          $set: { status: 'assigned' },
+        }
+      )
+
+      res.send({
+        success: true,
+        message: 'Decorator assigned successfully',
+      })
+    }
+    )
+
+    // statics
+    app.get('/admin/stats', verifyJWT, verifyAdmin, async (req, res) => {
+
+      // total bookings
+      const totalBookings = await bookingsCollection.countDocuments()
+
+      // total services
+      const totalServices = await servicesCollection.countDocuments()
+
+      // total decorators
+      const totalDecorators = await decoratorsCollection.countDocuments()
+
+      // total revenue using MongoDB $group operator
+      const revenueResult = await paymentCollection.aggregate([
+        {
+          $group: { _id: null,totalRevenue: { $sum: '$price' }} 
+          
+        }
+      ]).toArray()
+
+      res.send({
+        totalBookings,
+        totalServices,
+        totalDecorators,
+        totalRevenue: revenueResult[0]?.totalRevenue || 0,
+      })
     })
 
     // payment history
