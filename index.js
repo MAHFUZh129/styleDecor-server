@@ -54,7 +54,7 @@ async function run() {
     const servicesCollection = db.collection('services')
     const usersCollection = db.collection('users')
     const decoratorsCollection = db.collection('decorators')
-    const paymentCollection = db.collection('payment')
+    const bookingsCollection = db.collection('bookings')
 
     // sevices from db
     app.get('/services', async (req, res) => {
@@ -119,7 +119,7 @@ async function run() {
 
     // my bookings
     app.get('/my-bookings', verifyJWT, async (req, res) => {
-      const result = await paymentCollection
+      const result = await bookingsCollection
         .find({ customer: req.tokenEmail })
         .toArray()
       res.send(result)
@@ -137,12 +137,47 @@ async function run() {
         query.customer = email
       }
 
-      const result = await paymentCollection
+      const result = await bookingsCollection
         .find(query)
         .toArray()
 
       res.send(result)
     })
+
+    // cancel booking (status update)
+    app.patch('/my-bookings/cancel/:id', verifyJWT, async (req, res) => {
+      const id = req.params.id;
+
+      const booking = await bookingsCollection.findOne({
+        _id: new ObjectId(id),
+      });
+
+      if (!booking) {
+        return res.status(404).send({ message: 'Booking not found' });
+      }
+
+      // security check
+      if (booking.customer !== req.tokenEmail) {
+        return res.status(403).send({ message: 'Forbidden access' });
+      }
+
+      // already cancelled check
+      if (booking.status === 'cancelled') {
+        return res.send({ message: 'Already cancelled' });
+      }
+
+      const result = await bookingsCollection.updateOne(
+        { _id: new ObjectId(id) },
+        {
+          $set: {
+            status: 'cancelled',
+            cancelledAt: new Date().toLocaleDateString(),
+          },
+        }
+      );
+
+      res.send(result);
+    });
 
 
     // Payment 
@@ -181,7 +216,7 @@ async function run() {
       const service = await servicesCollection.findOne({
         _id: new ObjectId(session.metadata.serviceId),
       })
-      const payment = await paymentCollection.findOne({
+      const payment = await bookingsCollection.findOne({
         transactionId: session.payment_intent,
       })
 
@@ -199,7 +234,7 @@ async function run() {
           price: session.amount_total / 100,
           image: service?.image,
         }
-        const result = await paymentCollection.insertOne(paymentInfo)
+        const result = await bookingsCollection.insertOne(paymentInfo)
         // update plant quantity
         // await plantsCollection.updateOne(
         //   {
