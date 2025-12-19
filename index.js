@@ -174,7 +174,7 @@ async function run() {
       }
 
 
-    const result =  await decoratorsCollection.updateOne(
+      const result = await decoratorsCollection.updateOne(
         { _id: new ObjectId(decoratorId) },
         {
           $set: { status: 'assigned' },
@@ -189,10 +189,47 @@ async function run() {
 
       const id = req.params.id
       const { status } = req.body
-      const result= await decoratorsCollection.updateOne( { _id: new ObjectId(id) },{ $set: { status } })
+      const result = await decoratorsCollection.updateOne({ _id: new ObjectId(id) }, { $set: { status } })
 
-       res.send(result)
+      res.send(result)
     })
+
+    // Manage Services for admin
+    app.get('/admin/services', verifyJWT, async (req, res) => {
+      const result = await servicesCollection.find().toArray()
+      res.send(result)
+    })
+
+    app.patch('/admin/services/:id', verifyJWT, async (req, res) => {
+  const id = req.params.id
+  const updatedData = req.body
+
+  const result = await servicesCollection.updateOne(
+    { _id: new ObjectId(id) },
+    { $set: updatedData }
+  )
+
+  res.send(result)
+})
+
+app.post('/admin/services', verifyJWT, async (req, res) => {
+  const service = req.body
+  service.createdAt = new Date().toLocaleTimeString()
+
+  const result = await servicesCollection.insertOne(service)
+  res.send(result)
+})
+
+app.delete('/admin/services/:id', verifyJWT,async (req, res) => {
+  const id = req.params.id
+
+  const result = await servicesCollection.deleteOne({
+    _id: new ObjectId(id)
+  })
+
+  res.send(result)
+})
+
 
 
     // statics
