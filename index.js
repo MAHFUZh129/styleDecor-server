@@ -25,15 +25,15 @@ app.use(express.json())
 // jwt middlewares
 const verifyJWT = async (req, res, next) => {
   const token = req?.headers?.authorization?.split(' ')[1]
-  console.log(token)
+  // console.log(token)
   if (!token) return res.status(401).send({ message: 'Unauthorized Access!' })
   try {
     const decoded = await admin.auth().verifyIdToken(token)
     req.tokenEmail = decoded.email
-    console.log(decoded)
+    // console.log(decoded)
     next()
   } catch (err) {
-    console.log(err)
+    // console.log(err)
     return res.status(401).send({ message: 'Unauthorized Access!', err })
   }
 }
@@ -56,6 +56,28 @@ async function run() {
     const decoratorsCollection = db.collection('decorators')
     const bookingsCollection = db.collection('bookings')
 
+    // role middlewares
+    const verifyADMIN = async (req, res, next) => {
+      const email = req.tokenEmail
+      const user = await usersCollection.findOne({ email })
+      if (user?.role !== 'admin')
+        return res
+          .status(403)
+          .send({ message: 'Admin only Actions!', role: user?.role })
+
+      next()
+    }
+
+    const verifyDecorator = async (req, res, next) => {
+      const email = req.tokenEmail
+      const user = await usersCollection.findOne({ email })
+      if (user?.role !== 'decorator')
+        return res
+          .status(403)
+          .send({ message: 'Decorator only Actions!', role: user?.role })
+
+      next()
+    }
     // sevices from db
     app.get('/services', async (req, res) => {
 
@@ -101,9 +123,10 @@ async function run() {
     // save or update a user in db
     app.post('/user', async (req, res) => {
       const userData = req.body
-      userData.created_at = new Date().toISOString()
-      userData.last_loggedIn = new Date().toISOString()
+      userData.created_at = new Date().toLocaleDateString()
+      userData.last_loggedIn = new Date().toLocaleDateString()
       userData.role = 'user'
+      userData.status = 'active'
 
       const query = {
         email: userData.email,
@@ -137,7 +160,7 @@ async function run() {
       res.send(result)
     })
     // manage bookings
-    app.get('/admin/bookings', verifyJWT, async (req, res) => {
+    app.get('/admin/bookings', verifyJWT,verifyADMIN, async (req, res) => {
       const user = await usersCollection.findOne({ email: req.tokenEmail });
 
       if (user?.role !== 'admin') {
@@ -151,7 +174,7 @@ async function run() {
 
 
     // status update(bookings and decarators) 
-    app.patch('/admin/assign-decorator/:id', verifyJWT, async (req, res) => {
+    app.patch('/admin/assign-decorator/:id', verifyJWT,verifyADMIN ,async (req, res) => {
       const bookingId = req.params.id
       const { decoratorId, decoratorName, decoratorEmail } = req.body
 
@@ -185,7 +208,7 @@ async function run() {
     }
     )
 
-    app.patch('/admin/decorators/status/:id', verifyJWT, async (req, res) => {
+    app.patch('/admin/decorators/status/:id', verifyJWT, verifyADMIN, async (req, res) => {
 
       const id = req.params.id
       const { status } = req.body
@@ -195,45 +218,87 @@ async function run() {
     })
 
     // Manage Services for admin
-    app.get('/admin/services', verifyJWT, async (req, res) => {
+    app.get('/admin/services', verifyJWT,verifyADMIN, async (req, res) => {
       const result = await servicesCollection.find().toArray()
       res.send(result)
     })
 
-    app.patch('/admin/services/:id', verifyJWT, async (req, res) => {
-  const id = req.params.id
-  const updatedData = req.body
+    app.patch('/admin/services/:id', verifyJWT,verifyADMIN, async (req, res) => {
+      const id = req.params.id
+      const updatedData = req.body
 
-  const result = await servicesCollection.updateOne(
-    { _id: new ObjectId(id) },
-    { $set: updatedData }
-  )
+      const result = await servicesCollection.updateOne(
+        { _id: new ObjectId(id) },
+        { $set: updatedData }
+      )
 
-  res.send(result)
-})
+      res.send(result)
+    })
 
-app.post('/admin/services', verifyJWT, async (req, res) => {
-  const service = req.body
-  service.createdAt = new Date().toLocaleDateString()
+    app.post('/admin/services', verifyJWT,verifyADMIN, async (req, res) => {
+      const service = req.body
+      service.createdAt = new Date().toLocaleDateString()
 
-  const result = await servicesCollection.insertOne(service)
-  res.send(result)
-})
+      const result = await servicesCollection.insertOne(service)
+      res.send(result)
+    })
 
-app.delete('/admin/services/:id', verifyJWT,async (req, res) => {
-  const id = req.params.id
+    app.delete('/admin/services/:id', verifyJWT,verifyADMIN, async (req, res) => {
+      const id = req.params.id
 
-  const result = await servicesCollection.deleteOne({
-    _id: new ObjectId(id)
-  })
+      const result = await servicesCollection.deleteOne({
+        _id: new ObjectId(id)
+      })
 
-  res.send(result)
-})
+      res.send(result)
+    })
+
+    // users for admin
+    app.get('/admin/users', verifyJWT,verifyADMIN, async (req, res) => {
+      const users = await usersCollection.find().toArray()
+      res.send(users)
+    })
+
+    app.patch('/admin/users/status/:id', verifyJWT,verifyADMIN, async (req, res) => {
+      const id = req.params.id
+      const { status } = req.body
+      console.log(req.params.id)
+
+      const result = await usersCollection.updateOne(
+        { _id: new ObjectId(id) },
+        { $set: { status } }
+      )
+
+      res.send(result)
+    })
 
 
+    app.patch('/admin/users/role/:id', verifyJWT,verifyADMIN, async (req, res) => {
+      const id = req.params.id
+      const { role } = req.body
+      console.log('REQ BODY:', req.body)
+      console.log('REQ PARAM:', req.params.id)
+      const result = await usersCollection.updateOne(
+        { _id: new ObjectId(id) },
+        { $set: { role } }
+      )
 
-    // statics
-    app.get('/admin/stats', verifyJWT, async (req, res) => {
+      res.send(result)
+    })
+
+    app.delete('/admin/users/delete/:id', verifyJWT,verifyADMIN, async (req, res) => {
+      const id = req.params.id
+
+      const result = await usersCollection.deleteOne({
+        _id: new ObjectId(id)
+      })
+
+      res.send(result)
+    })
+
+
+    //admin statics
+    app.get('/admin/stats', verifyJWT,verifyADMIN, async (req, res) => {
 
       const totalBookings = await bookingsCollection.countDocuments()
 
@@ -255,6 +320,73 @@ app.delete('/admin/services/:id', verifyJWT,async (req, res) => {
         totalRevenue: revenueResult[0]?.totalRevenue || 0,
       })
     })
+
+    // decorator statics
+    app.get('/decorator/stats', verifyJWT,verifyDecorator, async (req, res) => {
+      const email = req.tokenEmail
+
+      const assigned = await bookingsCollection.countDocuments({
+        decoratorEmail: email,
+        status: 'assigned',
+      })
+
+      const ongoing = await bookingsCollection.countDocuments({
+        decoratorEmail: email,
+        status: 'ongoing',
+      })
+
+      const completed = await bookingsCollection.countDocuments({
+        decoratorEmail: email,
+        status: 'completed',
+      })
+
+      const earnings = await bookingsCollection.aggregate([
+        {
+          $match: {
+            decoratorEmail: email,
+            status: 'completed',
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            total: { $sum: '$price' },
+          },
+        },
+      ]).toArray()
+
+      res.send({
+        assigned,
+        ongoing,
+        completed,
+        earnings: earnings[0]?.total || 0,
+      })
+    }
+    )
+
+    // decorator's page
+    app.get('/decorator/projects', verifyJWT,verifyDecorator, async (req, res) => {
+      const email = req.query.email
+
+      const result = await bookingsCollection.find({
+        decoratorEmail: email,
+      }).toArray()
+
+      res.send(result)
+    })
+
+    app.patch('/decorator/projects/status/:id', verifyJWT,verifyDecorator, async (req, res) => {
+      const id = req.params.id
+      const { status } = req.body
+
+     const result= await bookingsCollection.updateOne(
+        { _id: new ObjectId(id) },
+        { $set: { status } }
+      )
+
+      res.send(result)
+    })
+
 
     // payment history
     app.get('/payments', verifyJWT, async (req, res) => {
