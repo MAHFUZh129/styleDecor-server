@@ -214,7 +214,7 @@ async function run() {
 
 app.post('/admin/services', verifyJWT, async (req, res) => {
   const service = req.body
-  service.createdAt = new Date().toLocaleTimeString()
+  service.createdAt = new Date().toLocaleDateString()
 
   const result = await servicesCollection.insertOne(service)
   res.send(result)
