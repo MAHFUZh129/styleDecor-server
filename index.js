@@ -160,7 +160,7 @@ async function run() {
       res.send(result)
     })
     // manage bookings
-    app.get('/admin/bookings', verifyJWT,verifyADMIN, async (req, res) => {
+    app.get('/admin/bookings', verifyJWT, verifyADMIN, async (req, res) => {
       const user = await usersCollection.findOne({ email: req.tokenEmail });
 
       if (user?.role !== 'admin') {
@@ -174,7 +174,7 @@ async function run() {
 
 
     // status update(bookings and decarators) 
-    app.patch('/admin/assign-decorator/:id', verifyJWT,verifyADMIN ,async (req, res) => {
+    app.patch('/admin/assign-decorator/:id', verifyJWT, verifyADMIN, async (req, res) => {
       const bookingId = req.params.id
       const { decoratorId, decoratorName, decoratorEmail } = req.body
 
@@ -218,12 +218,12 @@ async function run() {
     })
 
     // Manage Services for admin
-    app.get('/admin/services', verifyJWT,verifyADMIN, async (req, res) => {
+    app.get('/admin/services', verifyJWT, verifyADMIN, async (req, res) => {
       const result = await servicesCollection.find().toArray()
       res.send(result)
     })
 
-    app.patch('/admin/services/:id', verifyJWT,verifyADMIN, async (req, res) => {
+    app.patch('/admin/services/:id', verifyJWT, verifyADMIN, async (req, res) => {
       const id = req.params.id
       const updatedData = req.body
 
@@ -235,7 +235,7 @@ async function run() {
       res.send(result)
     })
 
-    app.post('/admin/services', verifyJWT,verifyADMIN, async (req, res) => {
+    app.post('/admin/services', verifyJWT, verifyADMIN, async (req, res) => {
       const service = req.body
       service.createdAt = new Date().toLocaleDateString()
 
@@ -243,7 +243,7 @@ async function run() {
       res.send(result)
     })
 
-    app.delete('/admin/services/:id', verifyJWT,verifyADMIN, async (req, res) => {
+    app.delete('/admin/services/:id', verifyJWT, verifyADMIN, async (req, res) => {
       const id = req.params.id
 
       const result = await servicesCollection.deleteOne({
@@ -254,12 +254,12 @@ async function run() {
     })
 
     // users for admin
-    app.get('/admin/users', verifyJWT,verifyADMIN, async (req, res) => {
+    app.get('/admin/users', verifyJWT, verifyADMIN, async (req, res) => {
       const users = await usersCollection.find().toArray()
       res.send(users)
     })
 
-    app.patch('/admin/users/status/:id', verifyJWT,verifyADMIN, async (req, res) => {
+    app.patch('/admin/users/status/:id', verifyJWT, verifyADMIN, async (req, res) => {
       const id = req.params.id
       const { status } = req.body
       console.log(req.params.id)
@@ -273,7 +273,7 @@ async function run() {
     })
 
 
-    app.patch('/admin/users/role/:id', verifyJWT,verifyADMIN, async (req, res) => {
+    app.patch('/admin/users/role/:id', verifyJWT, verifyADMIN, async (req, res) => {
       const id = req.params.id
       const { role } = req.body
       console.log('REQ BODY:', req.body)
@@ -286,7 +286,7 @@ async function run() {
       res.send(result)
     })
 
-    app.delete('/admin/users/delete/:id', verifyJWT,verifyADMIN, async (req, res) => {
+    app.delete('/admin/users/delete/:id', verifyJWT, verifyADMIN, async (req, res) => {
       const id = req.params.id
 
       const result = await usersCollection.deleteOne({
@@ -296,9 +296,34 @@ async function run() {
       res.send(result)
     })
 
+    app.post('/admin/decorators', verifyJWT, verifyADMIN, async (req, res) => {
+  const decorator = req.body
+
+  
+  const exists = await decoratorsCollection.findOne({
+    email: decorator.email,
+  })
+
+  if (exists) {
+    return res.status(400).send({ message: 'Decorator already exists' })
+  }
+
+  const newDecorator = {
+    name: decorator.name,
+    email: decorator.email,
+    image: decorator.image || '',
+    specialties: decorator.specialties || [],
+    status: 'available',
+    createdAt: new Date().toLocaleDateString,
+  }
+
+  const result = await decoratorsCollection.insertOne(newDecorator)
+  res.send(result)
+})
+
 
     //admin statics
-    app.get('/admin/stats', verifyJWT,verifyADMIN, async (req, res) => {
+    app.get('/admin/stats', verifyJWT, verifyADMIN, async (req, res) => {
 
       const totalBookings = await bookingsCollection.countDocuments()
 
@@ -322,7 +347,7 @@ async function run() {
     })
 
     // decorator statics
-    app.get('/decorator/stats', verifyJWT,verifyDecorator, async (req, res) => {
+    app.get('/decorator/stats', verifyJWT, verifyDecorator, async (req, res) => {
       const email = req.tokenEmail
 
       const assigned = await bookingsCollection.countDocuments({
@@ -365,7 +390,7 @@ async function run() {
     )
 
     // decorator's page
-    app.get('/decorator/projects', verifyJWT,verifyDecorator, async (req, res) => {
+    app.get('/decorator/projects', verifyJWT, verifyDecorator, async (req, res) => {
       const email = req.query.email
 
       const result = await bookingsCollection.find({
@@ -375,16 +400,38 @@ async function run() {
       res.send(result)
     })
 
-    app.patch('/decorator/projects/status/:id', verifyJWT,verifyDecorator, async (req, res) => {
+    app.patch('/decorator/projects/status/:id', verifyJWT, verifyDecorator, async (req, res) => {
       const id = req.params.id
       const { status } = req.body
 
-     const result= await bookingsCollection.updateOne(
+      const bookingResult = await bookingsCollection.updateOne(
         { _id: new ObjectId(id) },
         { $set: { status } }
       )
 
-      res.send(result)
+      const booking = await bookingsCollection.findOne({
+        _id: new ObjectId(id),
+      })
+
+      if (!booking) {
+        return res.status(404).send({ message: 'Booking not found' })
+      }
+
+      let decoratorStatus = 'available'
+
+    if (status === 'ongoing') {
+      decoratorStatus = 'busy'
+    }
+    if (status === 'completed') {
+      decoratorStatus = 'available'
+    }
+
+      const decoratorResult = await decoratorsCollection.updateOne(
+        { email: booking.decoratorEmail },
+        { $set: { status: decoratorStatus } }
+      )
+
+      res.send(bookingResult, decoratorResult)
     })
 
 
