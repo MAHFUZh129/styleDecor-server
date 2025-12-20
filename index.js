@@ -264,7 +264,7 @@ async function run() {
     app.patch('/admin/users/status/:id', verifyJWT, verifyADMIN, async (req, res) => {
       const id = req.params.id
       const { status } = req.body
-      console.log(req.params.id)
+      // console.log(req.params.id)
 
       const result = await usersCollection.updateOne(
         { _id: new ObjectId(id) },
@@ -278,8 +278,6 @@ async function run() {
     app.patch('/admin/users/role/:id', verifyJWT, verifyADMIN, async (req, res) => {
       const id = req.params.id
       const { role } = req.body
-      console.log('REQ BODY:', req.body)
-      console.log('REQ PARAM:', req.params.id)
       const result = await usersCollection.updateOne(
         { _id: new ObjectId(id) },
         { $set: { role } }
@@ -325,28 +323,43 @@ async function run() {
 
 
     //admin statics
+    
     app.get('/admin/stats', verifyJWT, verifyADMIN, async (req, res) => {
+  try {
+    const totalBookings = await bookingsCollection.countDocuments()
 
-      const totalBookings = await bookingsCollection.countDocuments()
+    const totalServices = await servicesCollection.countDocuments()
 
-      const totalServices = await servicesCollection.countDocuments()
+    const totalDecorators = await decoratorsCollection.countDocuments()
 
-      const totalDecorators = await decoratorsCollection.countDocuments()
+    const revenueResult = await bookingsCollection.aggregate([
+      {
+        $match: { status: 'completed' } 
+      },
+      {
+        $group: {
+          _id: null,
+          totalRevenue: { $sum: '$price' },
+          adminEarning: {
+            $sum: { $multiply: ['$price', 0.3] }, 
+          },
+        },
+      },
+    ]).toArray()
 
-      const revenueResult = await bookingsCollection.aggregate([
-        {
-          $group: { _id: null, totalRevenue: { $sum: '$price' } }
-
-        }
-      ]).toArray()
-
-      res.send({
-        totalBookings,
-        totalServices,
-        totalDecorators,
-        totalRevenue: revenueResult[0]?.totalRevenue || 0,
-      })
+    res.send({
+      totalBookings,
+      totalServices,
+      totalDecorators,
+      totalRevenue: revenueResult[0]?.totalRevenue || 0,
+      adminEarning: revenueResult[0]?.adminEarning || 0,
     })
+  } catch (error) {
+    console.error(error)
+    res.status(500).send({ message: 'Failed to load admin stats' })
+  }
+})
+
 
     // decorator statics
     app.get('/decorator/stats', verifyJWT, verifyDecorator, async (req, res) => {
