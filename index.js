@@ -70,7 +70,9 @@ async function run() {
 
     const verifyDecorator = async (req, res, next) => {
       const email = req.tokenEmail
+      // console.log(email)
       const user = await usersCollection.findOne({ email })
+      // console.log(user)
       if (user?.role !== 'decorator')
         return res
           .status(403)
@@ -360,31 +362,40 @@ async function run() {
         status: 'ongoing',
       })
 
-      const completed = await bookingsCollection.countDocuments({
-        decoratorEmail: email,
-        status: 'completed',
-      })
+     
 
-      const earnings = await bookingsCollection.aggregate([
-        {
-          $match: {
-            decoratorEmail: email,
-            status: 'completed',
-          },
-        },
-        {
-          $group: {
-            _id: null,
-            total: { $sum: '$price' },
-          },
-        },
-      ]).toArray()
+
+      const completedBookings = await bookingsCollection
+      .find({
+        status: 'completed',
+        decoratorEmail: email,
+      })
+      .toArray()
+
+      let totalDecoratorEarn = 0
+
+    const earnings = completedBookings.map((booking) => {
+      const price = booking.price || 0
+      const decoratorEarn = price * 0.7
+
+      totalDecoratorEarn += decoratorEarn
+
+      return {
+        _id: booking._id,
+        serviceName: booking?.name,
+        price,
+        decoratorEarn,
+      }
+    })
+
+      
 
       res.send({
         assigned,
         ongoing,
-        completed,
-        earnings: earnings[0]?.total || 0,
+        completedBookings: completedBookings.length,
+        earnings: Number(totalDecoratorEarn.toFixed(2)),
+        // 
       })
     }
     )
@@ -434,7 +445,41 @@ async function run() {
       res.send(bookingResult, decoratorResult)
     })
 
+app.get('/decorator/earnings', verifyJWT,verifyDecorator,async (req, res) => {
+    const decoratorEmail = req.tokenEmail
 
+    const completedBookings = await bookingsCollection
+      .find({
+        status: 'completed',
+        decoratorEmail: decoratorEmail,
+      })
+      .toArray()
+
+    let totalDecoratorEarn = 0
+
+    const earnings = completedBookings.map((booking) => {
+      const price = booking.price || 0
+      const decoratorEarn = price * 0.7
+
+      totalDecoratorEarn += decoratorEarn
+
+      return {
+        _id: booking._id,
+        serviceName: booking?.name,
+        price,
+        decoratorEarn,
+      }
+    })
+
+    res.send({
+      totalDecoratorEarn,
+      totalCompleted: earnings.length,
+      earnings,
+    })
+  }
+)
+
+    
     // payment history
     app.get('/payments', verifyJWT, async (req, res) => {
       const email = req.query.email
