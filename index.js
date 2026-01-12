@@ -83,7 +83,7 @@ async function run() {
     // sevices from db
     app.get('/services', async (req, res) => {
 
-      const result = await servicesCollection.find().limit(6).toArray()
+      const result = await servicesCollection.find().limit(8).toArray()
       res.send(result)
 
     })
@@ -104,7 +104,7 @@ async function run() {
     // decorators from db
     app.get('/top-decorators', async (req, res) => {
 
-      const result = await decoratorsCollection.find().limit(5).toArray()
+      const result = await decoratorsCollection.find().limit(6).toArray()
       res.send(result)
 
     })
